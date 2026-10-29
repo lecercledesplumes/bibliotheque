@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Statistiques de la visite</title>
+<style>
+:root{--bg:#14110d;--card:#1f1a13;--line:#3a3022;--gold:#e8c46a;--gold2:#b8903a;--tx:#f6e3b0;--mut:#a89a78;--ok:#6fcf8e;--bad:#ff7a6b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{padding:16px 16px 60px;max-width:640px;margin:0 auto}
+h1{font:600 22px/1.2 Georgia,serif;color:var(--gold);margin:6px 0 2px}
+h2{font:600 17px/1.2 Georgia,serif;color:var(--gold);margin:0 0 10px}
+.sub{color:var(--mut);font-size:14px;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+button{font:600 16px system-ui,sans-serif;border:0;border-radius:12px;padding:13px 16px;cursor:pointer;background:var(--gold);color:#241a07;min-height:48px}
+button.sec{background:#2d2518;color:var(--tx);border:1px solid var(--line)}
+button.bad{background:#3a1e19;color:var(--bad);border:1px solid #5a2c25}
+button:disabled{opacity:.45}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tabs button{background:#2d2518;color:var(--tx);border:1px solid var(--line);font-size:14px;padding:10px 6px;min-height:44px}
+.tabs button.on{background:var(--gold);color:#241a07;border-color:var(--gold)}
+.msg{padding:10px 12px;border-radius:10px;margin:10px 0;font-size:15px}
+.msg.ok{background:#16301f;color:var(--ok)}.msg.bad{background:#34191a;color:var(--bad)}.msg.info{background:#2a2316;color:var(--tx)}
+.mut{color:var(--mut);font-size:13px}
+.hide{display:none!important}
+.who{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.big div{background:#120f0a;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+.big b{display:block;font:700 30px Georgia,serif;color:var(--gold);font-variant-numeric:tabular-nums}
+.big span{font-size:13px;color:var(--mut)}
+.av{border-top:1px solid var(--line);padding:10px 0}.av:first-of-type{border-top:0}
+.av .t{overflow-wrap:anywhere;margin:4px 0 8px}.av .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-block;border-radius:20px;padding:4px 12px;font:700 13px system-ui;color:#10140f;border:0;min-height:0;cursor:pointer}
+.chip.vert{background:#6fcf8e}.chip.orange{background:#f0a040}.chip.rouge{background:#ff6b5b}
+.av button{min-height:40px;padding:8px 12px;font-size:14px}
+.it{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-top:1px solid var(--line)}
+.it:first-of-type{border-top:0}
+.it .n{font:700 18px Georgia,serif;font-variant-numeric:tabular-nums;color:var(--gold)}
+.it .l{min-width:0;overflow-wrap:anywhere}
+.it .bar{grid-column:1/3;height:6px;background:#120f0a;border-radius:4px;overflow:hidden}
+.it .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold))}
+.it .s{grid-column:1/3;font-size:12px;color:var(--mut)}
+</style></head>
+<body>
+<h1>Statistiques de la visite</h1>
+<p class="sub">Le cercle des plumes · tous les boutons</p>
+<div id="load" class="msg info">Chargement…</div>
+
+<div id="vLogin" class="card hide">
+ <h2>Connexion</h2>
+ <p class="mut" style="margin-top:0">Seul le compte Google du Cercle des plumes peut voir les statistiques.</p>
+ <button id="bLogin" style="width:100%">Se connecter avec Google</button>
+ <div id="lmsg"></div>
+</div>
+
+<div id="vMain" class="hide">
+ <div class="card who">
+  <div><div class="mut">Connecté</div><div id="who" style="word-break:break-all"></div></div>
+  <button id="bOut" class="sec">Se déconnecter</button>
+ </div>
+ <div class="card">
+  <div class="tabs" id="per"><button data-p="today" class="on">Aujourd’hui</button><button data-p="7">7 jours</button><button data-p="all">Depuis le début</button></div>
+  <div class="row" style="margin-top:10px"><button id="bRef" class="sec" style="flex:1">Actualiser</button></div>
+  <div id="smsg"></div>
+ </div>
+ <div class="card"><div class="big"><div><b id="tVis">0</b><span>entrées dans la visite</span></div><div><b id="tClk">0</b><span>appuis sur les boutons</span></div></div></div>
+ <div id="avisBox"></div>
+ <div id="groups"></div>
+ <div class="card">
+  <h2>Remise à zéro</h2>
+  <p class="mut" style="margin-top:0">Efface tous les compteurs (par exemple après tes tests). Impossible à annuler.</p>
+  <button id="bZero" class="bad" style="width:100%">Remettre tous les compteurs à zéro</button>
+  <div id="zmsg"></div>
+ </div>
+ <p class="mut">Les chiffres comptent les appuis, pas les personnes : quelqu’un qui appuie deux fois (à plus de 2 secondes d’écart) compte deux fois. « Nouveaux appareils » compte chaque téléphone ou ordinateur une seule fois.</p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+var OWNER='le.cercle.des.plumes2026@gmail.com';
+var CFG={apiKey:"AIzaSyBrZoKLbpBnC8imvSvlqTDUYyQ3gKwgA8k",authDomain:"le-cercle-des-plumes.firebaseapp.com",projectId:"le-cercle-des-plumes"};
+var SER=[['brutale','Brutale'],['lignees','Les lignées maudites'],['vendeur','Vendeur d’illusions'],['conflit','Conflit radical'],['nour','NØUR'],['masque','Sous le masque']];
+var GROUPS=[['Visiteurs',[['visite_entrer','Entrées dans la visite'],['visite_nouveau','Nouveaux appareils (première visite)'],['hotesse','Hôtesse touchée'],['livre_ouvert','Livre d’or ouvert'],['avis_envoye','Avis envoyés (avant validation)'],['ecran_auteurs','Écran des auteurs (vidéo)']]],
+ ['Tableaux et tomes',[]],
+ ['Lire ou écouter',[['btn_book','Livre'],['btn_audio','Audio']]],
+ ['Où trouver mes livres',[['btn_amazon','Amazon'],['btn_play','Google Play'],['btn_kobo','Kobo'],['btn_apple','Apple Livres']]],
+ ['Réseaux',[['btn_tiktok','TikTok'],['btn_youtube','YouTube'],['btn_facebook','Facebook'],['btn_instagram','Instagram'],['like_tiktok','J’aime TikTok (cœur suspendu)']]]];
+SER.forEach(function(s){GROUPS[1][1].push(['pad_'+s[0],s[1]+' : tapis lumineux (vidéo lancée)'],['tableau_'+s[0],s[1]+' : tableau touché'],['tablette_'+s[0],s[1]+' : tablette touchée']);});
+var LABEL={};GROUPS.forEach(function(g){g[1].forEach(function(x){LABEL[x[0]]=x[1];});});
+function $(i){return document.getElementById(i);}
+function show(id,on){$(id).classList.toggle('hide',!on);}
+function say(id,t,k){$(id).innerHTML=t?'<div class="msg '+(k||'info')+'">'+t+'</div>':'';}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+if(typeof firebase==='undefined'){$('load').className='msg bad';$('load').textContent='Impossible de charger Firebase. Vérifie ta connexion Internet puis recharge la page.';return;}
+firebase.initializeApp(CFG);
+var auth=firebase.auth(),db=firebase.firestore();
+var per='today',DATA={};
+setTimeout(function(){var l=$('load');if(l&&!l.classList.contains('hide')){l.className='msg bad';l.innerHTML='La connexion ne démarre pas depuis un fichier du téléphone. Ouvre cette page depuis ton site (adresse qui commence par https://lecercledesplumes.github.io/…).';}},5000);
+function errTxt(e){var c=(e&&e.code)||'';
+ if(c==='permission-denied')return 'Refusé : les règles de la base ne permettent pas encore de lire les statistiques. (Étape « règles » à faire une fois.)';
+ if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request')return 'Connexion annulée.';
+ if(c==='auth/popup-blocked')return 'Le navigateur a bloqué la fenêtre de connexion. Autorise les pop-up pour ce site, puis réessaie.';
+ return 'Erreur : '+((e&&e.message)||c||e);}
+$('bLogin').onclick=function(){say('lmsg','');var p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({login_hint:OWNER,prompt:'select_account'});auth.signInWithPopup(p).catch(function(e){say('lmsg',esc(errTxt(e)),'bad');});};
+$('bOut').onclick=function(){auth.signOut();};
+auth.onAuthStateChanged(function(u){show('load',false);
+ if(!u){show('vMain',false);show('vLogin',true);return;}
+ if((u.email||'').toLowerCase()!==OWNER){show('vMain',false);show('vLogin',true);say('lmsg','Ce compte ('+esc(u.email)+') n’est pas autorisé. Connecte-toi avec <b>'+OWNER+'</b>.','bad');auth.signOut();return;}
+ show('vLogin',false);show('vMain',true);$('who').textContent=u.email;load();loadAvis();});
+function ymd(d){return d.toLocaleDateString('sv-SE',{timeZone:'Europe/Paris'}).replace(/-/g,'');}
+function count(o){
+ if(per==='all')return +o.n||0;
+ var days=per==='today'?1:7,t=0,now=new Date();
+ for(var i=0;i<days;i++){var k='d'+ymd(new Date(now.getTime()-i*86400000));t+=+o[k]||0;}
+ return t;}
+function ago(ts){if(!ts||!ts.toDate)return '';var s=Math.round((Date.now()-ts.toDate().getTime())/1000);
+ if(s<60)return 'dernier appui : à l’instant';if(s<3600)return 'dernier appui : il y a '+Math.round(s/60)+' min';
+ if(s<86400)return 'dernier appui : il y a '+Math.round(s/3600)+' h';return 'dernier appui : il y a '+Math.round(s/86400)+' j';}
+function render(){
+ var ids={};Object.keys(LABEL).forEach(function(k){ids[k]=1;});Object.keys(DATA).forEach(function(k){ids[k]=1;});
+ var known={};GROUPS.forEach(function(g){g[1].forEach(function(x){known[x[0]]=1;});});
+ var groups=GROUPS.slice(),other=[];Object.keys(DATA).forEach(function(k){if(!known[k])other.push([k,'Autre : '+k]);});
+ if(other.length)groups.push(['Autres',other]);
+ var vis=count(DATA.visite_entrer||{}),clk=0,html='';
+ groups.forEach(function(g,gi){g[1].forEach(function(x){if(gi>0||x[0]==='hotesse'||x[0]==='ecran_auteurs')clk+=count(DATA[x[0]]||{});});});
+ $('tVis').textContent=vis;$('tClk').textContent=clk;
+ groups.forEach(function(g){
+  var rows=g[1].map(function(x){return {id:x[0],l:x[1],n:count(DATA[x[0]]||{}),t:(DATA[x[0]]||{}).t};});
+  var max=Math.max.apply(null,rows.map(function(r){return r.n;}).concat([1])),sum=rows.reduce(function(a,r){return a+r.n;},0);
+  html+='<div class="card"><h2>'+esc(g[0])+' <span class="mut">· '+sum+'</span></h2>'+rows.map(function(r){return '<div class="it"><div class="l">'+esc(r.l)+'</div><div class="n">'+r.n+'</div><div class="bar"><i style="width:'+Math.round(r.n/max*100)+'%"></i></div>'+(r.n&&r.t?'<div class="s">'+ago(r.t)+'</div>':'')+'</div>';}).join('')+'</div>';});
+ $('groups').innerHTML=html;}
+function load(){say('smsg','Chargement…');
+ db.collection('stats').get().then(function(q){DATA={};q.forEach(function(d){DATA[d.id]=d.data();});say('smsg','');render();})
+  .catch(function(e){say('smsg',esc(errTxt(e)),'bad');});}
+
+/* ---------- livre d'or : tri automatique par couleur, tu gardes le dernier mot ---------- */
+var AVIS=[];
+function norm(t){return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+var DURS=['connard','connasse','salope','merde','putain','encule','ordure','debile','abruti','nazi','pute','nique','fdp','ta gueule','va te faire','casino','bitcoin','crypto','viagra','gagne de l argent','achetez','cliquez','telegram','whatsapp'];
+var NEGS=['nul','nulle','bof','decu','decue','dommage','arnaque','escroc','pourri','mauvais','mauvaise','horrible','deteste','lent','lente','long','ennuyeux','confus','bug','ne marche pas','marche pas','decevant','mediocre','moyen','trop cher','a fuir','deconseille','pas terrible','pas top','pas bien','sans interet'];
+var POSS=['super','genial','magnifique','superbe','beau','belle','bravo','felicitations','j adore','jadore','adore','aime','excellent','parfait','merci','top','sublime','bluffant','incroyable','original','bien','j ai aime','touchant','envie','recommande','chouette','joli','jolie','impressionnant','reussi'];
+function has(t,l){return l.filter(function(w){return (' '+t+' ').indexOf(w.length<4?' '+w+' ':w)>-1;}).length;}
+function classify(m){var t=norm(m).replace(/[^a-z0-9' ]/g,' ').replace(/'/g,' ').replace(/\s+/g,' ');
+ var d=has(t,DURS),n=has(t,NEGS),p=has(t,POSS);
+ if(d||/https?:|www\.|\.com|\.fr\/|@/.test(norm(m))||(/[A-Z]{12,}/.test(String(m))))return 'rouge';
+ if(n&&p)return 'orange';if(n)return 'rouge';if(p)return 'vert';return 'orange';}
+var COLS=['vert','orange','rouge'],COLN={vert:'Favorable',orange:'Critique mais positif',rouge:'Déconseillé'};
+function renderAvis(){
+ var att=AVIS.filter(function(a){return a.status!=='ok';}),ok=AVIS.filter(function(a){return a.status==='ok';});
+ function row(a,wait){var c=a.col||classify(a.msg);
+  return '<div class="av" data-id="'+esc(a.id)+'"><div class="h"><button class="chip '+c+'" data-a="col">'+COLN[c]+' ⟳</button><span class="mut">'+esc(a.name||'Un lecteur')+'</span></div><div class="t">'+esc(a.msg)+'</div><div class="h">'+(wait?'<button data-a="ok">Accepter</button>':'')+'<button class="bad" data-a="del">'+(wait?'Refuser':'Supprimer')+'</button></div></div>';}
+ $('avisBox').innerHTML='<div class="card"><h2>Livre d’or · à valider <span class="mut">· '+att.length+'</span></h2>'+(att.length?att.map(function(a){return row(a,true);}).join(''):'<p class="mut" style="margin:0">Aucun nouveau message.</p>')+'<p class="mut">La couleur est proposée par le logiciel (il peut se tromper) : touche-la pour la changer. Un avis rouge ne peut pas être publié.</p></div>'
+  +'<div class="card"><h2>Livre d’or · publiés <span class="mut">· '+ok.length+'</span></h2>'+(ok.length?ok.map(function(a){return row(a,false);}).join(''):'<p class="mut" style="margin:0">Rien de publié pour l’instant.</p>')+'</div>';}
+$('avisBox').onclick=function(e){var b=e.target.closest('button');if(!b)return;var el=b.closest('.av'),id=el.dataset.id,a=AVIS.filter(function(x){return x.id===id;})[0];if(!a)return;
+ var act=b.dataset.a;
+ if(act==='col'){var c=a.col||classify(a.msg);a.col=COLS[(COLS.indexOf(c)+1)%3];db.collection('avis').doc(id).update({col:a.col}).catch(function(){});renderAvis();}
+ else if(act==='ok'){var c2=a.col||classify(a.msg);if(c2==='rouge'){alert0('Un avis rouge n’est jamais publié. Change la couleur si tu penses que le logiciel s’est trompé, ou refuse-le.');return;}
+  db.collection('avis').doc(id).update({status:'ok',col:c2}).then(function(){a.status='ok';a.col=c2;renderAvis();}).catch(function(er){say('smsg',esc(errTxt(er)),'bad');});}
+ else if(act==='del'){db.collection('avis').doc(id).delete().then(function(){AVIS=AVIS.filter(function(x){return x.id!==id;});renderAvis();}).catch(function(er){say('smsg',esc(errTxt(er)),'bad');});}};
+function alert0(t){say('smsg',esc(t),'bad');window.scrollTo(0,0);}
+function loadAvis(){db.collection('avis').get().then(function(q){AVIS=[];q.forEach(function(d){var x=d.data();x.id=d.id;AVIS.push(x);});AVIS.sort(function(a,b){var ta=a.ts&&a.ts.toMillis?a.ts.toMillis():0,tb=b.ts&&b.ts.toMillis?b.ts.toMillis():0;return tb-ta;});renderAvis();}).catch(function(e){$('avisBox').innerHTML='<div class="msg bad">Livre d’or : '+esc(errTxt(e))+'</div>';});}
+
+$('bRef').onclick=function(){load();loadAvis();};
+$('per').onclick=function(e){var b=e.target.closest('button');if(!b)return;per=b.dataset.p;[].forEach.call($('per').children,function(x){x.classList.toggle('on',x===b);});render();};
+var zArm=false;
+$('bZero').onclick=function(){
+ if(!zArm){zArm=true;$('bZero').textContent='Oui, tout effacer (touche encore)';say('zmsg','Tu es sûr ? Tous les compteurs repartent de zéro.','bad');setTimeout(function(){zArm=false;$('bZero').textContent='Remettre tous les compteurs à zéro';say('zmsg','');},6000);return;}
+ zArm=false;$('bZero').textContent='Remettre tous les compteurs à zéro';
+ var ks=Object.keys(DATA);if(!ks.length){say('zmsg','Rien à effacer.','info');return;}
+ var b=db.batch();ks.forEach(function(k){b.delete(db.collection('stats').doc(k));});
+ b.commit().then(function(){say('zmsg','Compteurs remis à zéro.','ok');load();}).catch(function(e){say('zmsg',esc(errTxt(e)),'bad');});};
+})();
+</script>
+</body></html>
