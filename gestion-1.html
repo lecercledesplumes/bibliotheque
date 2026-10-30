@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Gestion des tomes</title>
+<style>
+:root{--bg:#14110d;--card:#1f1a13;--line:#3a3022;--gold:#e8c46a;--gold2:#b8903a;--tx:#f6e3b0;--mut:#a89a78;--ok:#6fcf8e;--bad:#ff7a6b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{padding:16px 16px 60px;max-width:640px;margin:0 auto}
+h1{font:600 22px/1.2 Georgia,serif;color:var(--gold);margin:6px 0 2px}
+h2{font:600 17px/1.2 Georgia,serif;color:var(--gold);margin:0 0 10px}
+.sub{color:var(--mut);font-size:14px;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+button{font:600 16px system-ui,sans-serif;border:0;border-radius:12px;padding:13px 16px;cursor:pointer;background:var(--gold);color:#241a07;min-height:48px}
+button.sec{background:#2d2518;color:var(--tx);border:1px solid var(--line)}
+button.bad{background:#3a1e19;color:var(--bad);border:1px solid #5a2c25}
+button:disabled{opacity:.45}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row>*{min-width:0}
+.tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.tabs button{background:#2d2518;color:var(--tx);border:1px solid var(--line);font-size:14px;padding:10px 8px;min-height:44px}
+.tabs button.on{background:var(--gold);color:#241a07;border-color:var(--gold)}
+label{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
+input[type=text],input[type=url],select{width:100%;font:16px system-ui,sans-serif;background:#120f0a;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:12px}
+input[type=file]{width:100%;color:var(--mut);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.grid button{padding:0;min-height:50px;font-size:17px;background:#241e14;color:var(--mut);border:1px solid var(--line)}
+.grid button.ok{background:#1d3324;color:var(--ok);border-color:#2e5a3d}
+.grid button.hid{opacity:.4;border-style:dashed}
+.grid button.sel{outline:3px solid var(--gold)}
+.msg{padding:10px 12px;border-radius:10px;margin:10px 0;font-size:15px}
+.msg.ok{background:#16301f;color:var(--ok)}
+.msg.bad{background:#34191a;color:var(--bad)}
+.msg.info{background:#2a2316;color:var(--tx)}
+.mut{color:var(--mut);font-size:13px}
+.hide{display:none!important}
+.who{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+img.prev{max-width:120px;max-height:170px;border-radius:8px;border:1px solid var(--line);display:block;margin-top:8px}
+</style></head>
+<body>
+<h1>Gestion des tomes et de la salle</h1>
+<p class="sub">Le cercle des plumes · visite 3D</p>
+
+<div id="load" class="msg info">Chargement…</div>
+
+<!-- Écran de connexion -->
+<div id="vLogin" class="card hide">
+ <h2>Connexion</h2>
+ <p class="mut" style="margin-top:0">Seul le compte Google du Cercle des plumes peut modifier les tomes.</p>
+ <button id="bLogin" style="width:100%">Se connecter avec Google</button>
+ <div id="lmsg"></div>
+</div>
+
+<!-- Écran principal -->
+<div id="vMain" class="hide">
+ <div class="card who">
+  <div><div class="mut">Connecté</div><div id="who" style="word-break:break-all"></div></div>
+  <button id="bOut" class="sec">Se déconnecter</button>
+ </div>
+
+ <div class="card">
+  <h2>1 · Choisis la série</h2>
+  <div class="tabs" id="tabs"></div>
+ </div>
+
+ <div class="card">
+  <h2>2 · Cases visibles</h2>
+  <p class="mut" style="margin-top:0">Nombre de cases que les visiteurs voient dans la tablette de cette série (de 10 à 50).</p>
+  <div class="row">
+   <select id="vis" style="flex:1"></select>
+   <button id="bVis">Enregistrer</button>
+  </div>
+  <div id="vmsg"></div>
+ </div>
+
+ <div class="card">
+  <h2>3 · Choisis le tome</h2>
+  <p class="mut" style="margin-top:0">Vert = tome en ligne. Pointillés = case pas encore visible pour les visiteurs.</p>
+  <div class="grid" id="grid"></div>
+ </div>
+
+ <div class="card hide" id="ed">
+  <h2 id="edT">Tome</h2>
+  <div id="edStatus" class="mut"></div>
+  <label>Titre du tome (facultatif)</label>
+  <input type="text" id="fTitle" placeholder="Ex. Les ombres du périph">
+  <label>Auteur / sous-titre (facultatif)</label>
+  <input type="text" id="fSub" placeholder="Laisse vide pour garder celui de la série">
+  <label>Lien FlipHTML5 (bouton « Lire »)</label>
+  <input type="url" id="fFlip" placeholder="https://online.fliphtml5.com/…">
+  <label>Lien Amazon (bouton « Acheter »)</label>
+  <input type="url" id="fAmz" placeholder="https://www.amazon.fr/dp/…">
+  <label>Couverture du tome (image)</label>
+  <input type="file" id="fCov" accept="image/*">
+  <img id="covPrev" class="prev hide" alt="">
+  <label>Vidéo de 5 secondes (mp4, 700 Ko maximum)</label>
+  <input type="file" id="fVid" accept="video/mp4,video/*">
+  <div id="vidInfo" class="mut"></div>
+  <div class="row" style="margin-top:16px">
+   <button id="bSave" style="flex:1">Enregistrer le tome</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+   <button id="bDelVid" class="sec">Retirer la vidéo</button>
+   <button id="bDelCov" class="sec">Retirer la couverture</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+   <button id="bDel" class="bad" style="flex:1">Retirer ce tome de la visite</button>
+  </div>
+  <div id="emsg"></div>
+ </div>
+
+ <div class="card">
+  <h2>4 · Musiques d’entrée</h2>
+  <p class="mut" style="margin-top:0">Jusqu’à 5 musiques, jouées l’une après l’autre dans la visite. Fichier audio (mp3), 700 Ko maximum chacune, soit environ 1 minute. Sans musique ajoutée, la musique douce intégrée est gardée.</p>
+  <div id="musList"></div>
+  <div id="mmsg"></div>
+ </div>
+
+
+ <div class="card">
+  <h2>5 · Ambiance de la salle</h2>
+  <p class="mut" style="margin-top:0">Choisis une couleur toute prête, puis ajuste avec les curseurs. L’aperçu montre l’effet. Touche « Enregistrer l’ambiance » : la visite le prend au prochain chargement.</p>
+  <div class="tabs" id="amPre"></div>
+  <div id="amPrev" style="position:relative;height:70px;border-radius:12px;margin:14px 0;background:linear-gradient(90deg,#f6e3b0,#d9a441,#7a1018,#1f5a3a,#1d3d7a);overflow:hidden"><div id="amOv" style="position:absolute;inset:0;mix-blend-mode:multiply"></div></div>
+  <label>Luminosité générale : <b id="vLum"></b></label><input type="range" id="sLum" min="40" max="160" step="5" style="width:100%">
+  <label>Rouge : <b id="vR"></b></label><input type="range" id="sR" min="0" max="100" step="5" style="width:100%">
+  <label>Vert : <b id="vG"></b></label><input type="range" id="sG" min="0" max="100" step="5" style="width:100%">
+  <label>Bleu : <b id="vB"></b></label><input type="range" id="sB" min="0" max="100" step="5" style="width:100%">
+  <label>Salle tamisée pendant la vidéo (0 = pas tamisé, 100 = très sombre) : <b id="vD"></b></label><input type="range" id="sD" min="0" max="150" step="5" style="width:100%">
+  <div class="row" style="margin-top:14px"><button id="amSave" style="flex:1">Enregistrer l’ambiance</button><button id="amReset" class="sec">Remettre normal</button></div>
+  <div id="amMsg"></div>
+ </div>
+
+ <p class="mut">Les changements apparaissent dans la visite dès que le visiteur la recharge. Pas besoin de toucher à GitHub.</p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+var OWNER='le.cercle.des.plumes2026@gmail.com';
+var CFG={apiKey:"AIzaSyBrZoKLbpBnC8imvSvlqTDUYyQ3gKwgA8k",authDomain:"le-cercle-des-plumes.firebaseapp.com",projectId:"le-cercle-des-plumes",storageBucket:"le-cercle-des-plumes.firebasestorage.app",messagingSenderId:"957297324221",appId:"1:957297324221:web:2db1cd500088a8af8307d4"};
+var SERIES=[['brutale','Brutale'],['conflit','Conflit radical'],['lignees','Les lignées maudites'],['masque','Sous le masque'],['vendeur','Vendeur d’illusions'],['nour','NØUR']];
+var MAXVID=1000000; // taille max du texte encodé (≈ 740 Ko de vidéo réelle)
+function $(i){return document.getElementById(i);}
+function show(id,on){$(id).classList.toggle('hide',!on);}
+function say(id,txt,kind){$(id).innerHTML=txt?'<div class="msg '+(kind||'info')+'">'+txt+'</div>':'';}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+if(typeof firebase==='undefined'){
+  $('load').className='msg bad';
+  $('load').textContent='Impossible de charger Firebase. Vérifie ta connexion Internet puis recharge la page.';
+  return;
+}
+firebase.initializeApp(CFG);
+var auth=firebase.auth(),db=firebase.firestore();
+var cur=SERIES[0][0], tomes={}, visN=10, selN=0, newVid=null, newCov=null, delVid=false, delCov=false;
+
+function errTxt(e){
+  var c=(e&&e.code)||'';
+  if(c==='permission-denied')return 'Refusé : ce compte n’a pas le droit de modifier. Connecte-toi avec le compte du Cercle des plumes.';
+  if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request')return 'Connexion annulée.';
+  if(c==='auth/popup-blocked')return 'Le navigateur a bloqué la fenêtre de connexion. Autorise les fenêtres pop-up pour ce site, puis réessaie.';
+  if(c==='auth/unauthorized-domain')return 'Ce site n’est pas autorisé dans Firebase (domaines autorisés).';
+  if(c==='unavailable')return 'Connexion à la base impossible pour le moment. Réessaie dans un instant.';
+  return 'Erreur : '+((e&&e.message)||c||e);
+}
+
+/* ---------- connexion ---------- */
+$('bLogin').onclick=function(){
+  say('lmsg','');
+  var p=new firebase.auth.GoogleAuthProvider();
+  p.setCustomParameters({login_hint:OWNER,prompt:'select_account'});
+  auth.signInWithPopup(p).catch(function(e){say('lmsg',esc(errTxt(e)),'bad');});
+};
+$('bOut').onclick=function(){auth.signOut();};
+auth.onAuthStateChanged(function(u){
+  show('load',false);
+  if(!u){show('vMain',false);show('vLogin',true);return;}
+  if((u.email||'').toLowerCase()!==OWNER){
+    show('vMain',false);show('vLogin',true);
+    say('lmsg','Ce compte ('+esc(u.email)+') n’est pas autorisé. Connecte-toi avec <b>'+OWNER+'</b>.','bad');
+    auth.signOut();return;
+  }
+  show('vLogin',false);show('vMain',true);
+  $('who').textContent=u.email;
+  buildTabs();buildVisSel();loadSeries(cur);musLoadAll();amInit();
+});
+
+/* ---------- séries ---------- */
+function buildTabs(){
+  var t=$('tabs');t.innerHTML='';
+  SERIES.forEach(function(s){
+    var b=document.createElement('button');b.textContent=s[1];
+    if(s[0]===cur)b.className='on';
+    b.onclick=function(){cur=s[0];selN=0;show('ed',false);buildTabs();loadSeries(cur);};
+    t.appendChild(b);
+  });
+}
+function buildVisSel(){
+  var s=$('vis');if(s.options.length)return;
+  for(var n=10;n<=50;n++){var o=document.createElement('option');o.value=n;o.textContent=n+' cases';s.appendChild(o);}
+}
+function loadSeries(id){
+  say('vmsg','');tomes={};visN=10;drawGrid();
+  Promise.all([
+    db.collection('series').doc(id).get(),
+    db.collection('tomes').where('series','==',id).get()
+  ]).then(function(r){
+    if(id!==cur)return;
+    var sd=r[0].exists?r[0].data():null;
+    visN=(sd&&sd.visible>=10&&sd.visible<=50)?Math.floor(sd.visible):10;
+    r[1].forEach(function(d){var x=d.data();var n=Math.floor(x.n);if(n>=1&&n<=50)tomes[n]=x;});
+    $('vis').value=String(visN);
+    drawGrid();
+  }).catch(function(e){say('vmsg',esc(errTxt(e)),'bad');});
+}
+$('bVis').onclick=function(){
+  var v=parseInt($('vis').value,10);
+  db.collection('series').doc(cur).set({visible:v,updated:Date.now()},{merge:true}).then(function(){
+    visN=v;drawGrid();say('vmsg','Enregistré : '+v+' cases visibles.','ok');
+  }).catch(function(e){say('vmsg',esc(errTxt(e)),'bad');});
+};
+
+/* ---------- grille ---------- */
+function drawGrid(){
+  var g=$('grid');g.innerHTML='';
+  for(var n=1;n<=50;n++){(function(n){
+    var b=document.createElement('button');b.textContent=n;
+    var c=[];if(tomes[n])c.push('ok');if(n>visN&&!tomes[n])c.push('hid');if(n===selN)c.push('sel');
+    b.className=c.join(' ');
+    b.onclick=function(){openEd(n);};
+    g.appendChild(b);
+  })(n);}
+}
+
+/* ---------- éditeur de tome ---------- */
+function kb(n){return Math.round(n/1024);}
+function openEd(n){
+  selN=n;newVid=null;newCov=null;delVid=false;delCov=false;
+  var x=tomes[n]||null;
+  $('edT').textContent='Tome '+n+' · '+(SERIES.filter(function(s){return s[0]===cur;})[0][1]);
+  $('fTitle').value=x?x.title||'':'';$('fSub').value=x?x.sub||'':'';
+  $('fFlip').value=x?x.flip||'':'';$('fAmz').value=x?x.amz||'':'';
+  $('fCov').value='';$('fVid').value='';
+  show('covPrev',false);$('covPrev').removeAttribute('src');
+  statusTxt();
+  say('emsg','');
+  show('bDel',!!x);
+  show('ed',true);drawGrid();
+  $('ed').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function statusTxt(){
+  var x=tomes[selN]||null,t=[];
+  if(!x)t.push('Tome pas encore en ligne.');
+  else t.push('Tome en ligne.');
+  var hv=newVid?true:(x&&x.hv&&!delVid), hc=newCov?true:(x&&x.hc&&!delCov);
+  t.push(hv?(newVid?'Vidéo prête à envoyer ('+kb(newVid.length*0.75)+' Ko).':'Vidéo en ligne'+(x&&x.vk?' ('+x.vk+' Ko)':'')+'.'):'Pas de vidéo.');
+  t.push(hc?(newCov?'Nouvelle couverture prête.':'Couverture en ligne.'):'Pas de couverture (celle de la série sera utilisée).');
+  $('edStatus').textContent=t.join(' ');
+  $('vidInfo').textContent='';
+}
+function readDataURL(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result);};r.onerror=function(){rej(new Error('Lecture du fichier impossible'));};r.readAsDataURL(f);});}
+$('fVid').onchange=function(){
+  var f=this.files&&this.files[0];newVid=null;
+  if(!f){statusTxt();return;}
+  readDataURL(f).then(function(d){
+    if(d.indexOf('data:video')!==0)d='data:video/mp4;base64,'+d.split(',')[1];
+    if(d.length>MAXVID){
+      $('fVid').value='';
+      say('emsg','Cette vidéo est trop lourde ('+kb(f.size)+' Ko). Maximum : 700 Ko. Fais une vidéo plus courte ou plus légère (5 secondes).','bad');
+      statusTxt();return;
+    }
+    say('emsg','');newVid=d;delVid=false;statusTxt();
+  }).catch(function(e){say('emsg',esc(e.message),'bad');});
+};
+function shrinkImage(f){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(f),im=new Image();
+    im.onload=function(){
+      var M=520,w=im.naturalWidth,h=im.naturalHeight,k=Math.min(1,M/Math.max(w,h));
+      var c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      var q=.85,out=c.toDataURL('image/jpeg',q);
+      while(out.length>300000&&q>.4){q-=.1;out=c.toDataURL('image/jpeg',q);}
+      URL.revokeObjectURL(url);res(out);
+    };
+    im.onerror=function(){URL.revokeObjectURL(url);rej(new Error('Image illisible'));};
+    im.src=url;
+  });
+}
+$('fCov').onchange=function(){
+  var f=this.files&&this.files[0];newCov=null;
+  if(!f){statusTxt();return;}
+  shrinkImage(f).then(function(d){
+    newCov=d;delCov=false;$('covPrev').src=d;show('covPrev',true);statusTxt();
+  }).catch(function(e){say('emsg',esc(e.message),'bad');});
+};
+$('bDelVid').onclick=function(){newVid=null;$('fVid').value='';delVid=true;statusTxt();say('emsg','La vidéo sera retirée quand tu enregistreras le tome.','info');};
+$('bDelCov').onclick=function(){newCov=null;$('fCov').value='';show('covPrev',false);delCov=true;statusTxt();say('emsg','La couverture sera retirée quand tu enregistreras le tome.','info');};
+
+function cleanLink(s){s=(s||'').trim();if(s&&!/^https?:\/\//i.test(s))s='https://'+s;return s;}
+$('bSave').onclick=function(){
+  var n=selN;if(!n)return;
+  var old=tomes[n]||{};var id=cur+'_'+n;
+  var hv=newVid?true:(!!old.hv&&!delVid), hc=newCov?true:(!!old.hc&&!delCov);
+  var vk=newVid?kb(newVid.length*0.75):(hv?(old.vk||0):0);
+  var meta={series:cur,n:n,title:$('fTitle').value.trim(),sub:$('fSub').value.trim(),flip:cleanLink($('fFlip').value),amz:cleanLink($('fAmz').value),hv:hv,hc:hc,vk:vk,updated:Date.now()};
+  var b=db.batch();
+  b.set(db.collection('tomes').doc(id),meta);
+  if(newVid)b.set(db.collection('media').doc(id+'_v'),{d:newVid});
+  else if(old.hv&&delVid)b.delete(db.collection('media').doc(id+'_v'));
+  if(newCov)b.set(db.collection('media').doc(id+'_c'),{d:newCov});
+  else if(old.hc&&delCov)b.delete(db.collection('media').doc(id+'_c'));
+  $('bSave').disabled=true;say('emsg','Enregistrement…','info');
+  b.commit().then(function(){
+    tomes[n]=meta;newVid=null;newCov=null;delVid=false;delCov=false;
+    $('fVid').value='';$('fCov').value='';
+    show('bDel',true);statusTxt();drawGrid();
+    say('emsg','Tome '+n+' enregistré. Il est en ligne dans la visite.','ok');
+  }).catch(function(e){say('emsg',esc(errTxt(e)),'bad');}).then(function(){$('bSave').disabled=false;});
+};
+$('bDel').onclick=function(){
+  var n=selN,x=tomes[n];if(!x)return;
+  if(!$('bDel').dataset.sure){
+    $('bDel').dataset.sure='1';$('bDel').textContent='Touche encore pour confirmer';
+    setTimeout(function(){delete $('bDel').dataset.sure;$('bDel').textContent='Retirer ce tome de la visite';},4000);
+    return;
+  }
+  delete $('bDel').dataset.sure;$('bDel').textContent='Retirer ce tome de la visite';
+  var id=cur+'_'+n,b=db.batch();
+  b.delete(db.collection('tomes').doc(id));
+  b.delete(db.collection('media').doc(id+'_v'));
+  b.delete(db.collection('media').doc(id+'_c'));
+  b.commit().then(function(){
+    delete tomes[n];drawGrid();openEd(n);
+    say('emsg','Tome '+n+' retiré de la visite.','ok');
+  }).catch(function(e){say('emsg',esc(errTxt(e)),'bad');});
+};
+/* ---------- musiques d'entrée ---------- */
+var mus={},musNew={};
+function musLoadAll(){
+  db.collection('music').get().then(function(q){
+    mus={};q.forEach(function(d){var x=d.data();var n=Math.floor(x.n);if(n>=1&&n<=5)mus[n]=x;});
+    musDraw();
+  }).catch(function(e){say('mmsg',esc(errTxt(e)),'bad');});
+}
+function musDraw(){
+  var L=$('musList');L.innerHTML='';
+  for(var n=1;n<=5;n++){(function(n){
+    var x=mus[n]||null,box=document.createElement('div');
+    box.style.cssText='border-top:1px solid var(--line);padding:10px 0';
+    box.innerHTML='<div><b>Musique '+n+'</b> <span class="mut">'+(x&&x.hm?'· en ligne ('+(x.kb||'?')+' Ko)':'· vide')+'</span></div>'+
+     '<label>Nom (pour toi)</label><input type="text" id="mt'+n+'" value="'+esc(x?x.title||'':'')+'" placeholder="Ex. Piano doux">'+
+     '<label>Fichier audio</label><input type="file" id="mf'+n+'" accept="audio/*">'+
+     '<audio id="ma'+n+'" controls class="hide" style="width:100%;margin-top:8px"></audio>'+
+     '<div class="row" style="margin-top:10px"><button id="ms'+n+'" style="flex:1">Enregistrer</button>'+(x&&x.hm?'<button id="md'+n+'" class="bad">Retirer</button>':'')+'</div><div id="mm'+n+'"></div>';
+    L.appendChild(box);
+    $('mf'+n).onchange=function(){
+      var f=this.files&&this.files[0];delete musNew[n];show('ma'+n,false);
+      if(!f)return;
+      readDataURL(f).then(function(d){
+        if(d.indexOf('data:audio')!==0)d='data:audio/mpeg;base64,'+d.split(',')[1];
+        if(d.length>MAXVID){$('mf'+n).value='';say('mm'+n,'Ce fichier est trop lourd ('+kb(f.size)+' Ko). Maximum : 700 Ko.','bad');return;}
+        musNew[n]=d;say('mm'+n,'Prêt à envoyer ('+kb(d.length*0.75)+' Ko). Touche Enregistrer.','info');
+        $('ma'+n).src=d;show('ma'+n,true);
+        if(!$('mt'+n).value)$('mt'+n).value=f.name.replace(/\.[^.]+$/,'');
+      }).catch(function(e){say('mm'+n,esc(e.message),'bad');});
+    };
+    $('ms'+n).onclick=function(){
+      var old=mus[n]||{},d=musNew[n];
+      if(!d&&!old.hm){say('mm'+n,'Choisis d’abord un fichier audio.','bad');return;}
+      var meta={n:n,title:$('mt'+n).value.trim(),on:true,hm:true,kb:d?kb(d.length*0.75):(old.kb||0),updated:Date.now()};
+      var b=db.batch();b.set(db.collection('music').doc('m'+n),meta);
+      if(d)b.set(db.collection('media').doc('music_m'+n),{d:d});
+      $('ms'+n).disabled=true;say('mm'+n,'Enregistrement…','info');
+      b.commit().then(function(){mus[n]=meta;delete musNew[n];musDraw();say('mm'+n,'Musique '+n+' enregistrée.','ok');})
+       .catch(function(e){say('mm'+n,esc(errTxt(e)),'bad');$('ms'+n).disabled=false;});
+    };
+    if($('md'+n))$('md'+n).onclick=function(){
+      if(!this.dataset.sure){var t=this;t.dataset.sure='1';t.textContent='Touche encore';setTimeout(function(){delete t.dataset.sure;t.textContent='Retirer';},4000);return;}
+      var b=db.batch();b.delete(db.collection('music').doc('m'+n));b.delete(db.collection('media').doc('music_m'+n));
+      b.commit().then(function(){delete mus[n];delete musNew[n];musDraw();say('mmsg','Musique '+n+' retirée.','ok');})
+       .catch(function(e){say('mm'+n,esc(errTxt(e)),'bad');});
+    };
+  })(n);}
+}
+
+/* ---------- ambiance de la salle (document series/salle) ---------- */
+var AM={lum:100,r:100,g:100,b:100,dimv:100};
+var PRE=[['Normal',100,100,100,100],['Orange chaud',100,62,32,100],['Rouge',100,30,30,100],['Vert',40,100,55,100],['Bleu',35,60,100,100],['Violet',80,35,100,100]];
+function amDraw(){
+  $('sLum').value=AM.lum;$('sR').value=AM.r;$('sG').value=AM.g;$('sB').value=AM.b;$('sD').value=AM.dimv;
+  $('vLum').textContent=AM.lum+' %';$('vR').textContent=AM.r+' %';$('vG').textContent=AM.g+' %';$('vB').textContent=AM.b+' %';$('vD').textContent=AM.dimv;
+  var c=function(v){return Math.round(255*v/100);};
+  $('amOv').style.background='rgb('+c(AM.r)+','+c(AM.g)+','+c(AM.b)+')';
+  $('amPrev').style.filter='brightness('+(AM.lum/100)+')';
+}
+function amInit(){
+  var p=$('amPre');p.innerHTML='';
+  PRE.forEach(function(x){var b=document.createElement('button');b.textContent=x[0];b.onclick=function(){AM.r=x[1];AM.g=x[2];AM.b=x[3];amDraw();};p.appendChild(b);});
+  [['sLum','lum'],['sR','r'],['sG','g'],['sB','b'],['sD','dimv']].forEach(function(a){$(a[0]).oninput=function(){AM[a[1]]=parseInt(this.value,10);amDraw();};});
+  db.collection('series').doc('salle').get().then(function(d){
+    if(d.exists){var x=d.data();['lum','r','g','b','dimv'].forEach(function(k){if(typeof x[k]==='number')AM[k]=x[k];});}
+    amDraw();
+  }).catch(function(e){say('amMsg',esc(errTxt(e)),'bad');amDraw();});
+}
+$('amReset').onclick=function(){AM={lum:100,r:100,g:100,b:100,dimv:100};amDraw();};
+$('amSave').onclick=function(){
+  $('amSave').disabled=true;say('amMsg','Enregistrement…','info');
+  db.collection('series').doc('salle').set({lum:AM.lum,r:AM.r,g:AM.g,b:AM.b,dimv:AM.dimv,updated:Date.now()},{merge:true}).then(function(){
+    say('amMsg','Ambiance enregistrée. Elle apparaît dans la visite au prochain chargement.','ok');
+  }).catch(function(e){say('amMsg',esc(errTxt(e)),'bad');}).then(function(){$('amSave').disabled=false;});
+};
+})();
+</script>
+</body></html>
