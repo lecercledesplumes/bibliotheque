@@ -1,4 +1,19 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Le cercle des plumes</title>
-<meta http-equiv="refresh" content="0;url=plumes-visite-v70.html">
-<style>html,body{margin:0;height:100%;background:#120d08;color:#f0d9a0;font:18px system-ui,sans-serif}body{display:flex;align-items:center;justify-content:center}</style></head>
-<body><p>Chargement de la visite…</p><script>location.replace('plumes-visite-v70.html');</script></body></html>
+<style>html,body{margin:0;height:100%;background:#120d08;color:#f0d9a0;font:18px system-ui,sans-serif}#m{display:flex;height:100%;align-items:center;justify-content:center;text-align:center;padding:24px;box-sizing:border-box;line-height:1.5}</style></head>
+<body><div id="m">Chargement de la visite…</div>
+<script>
+var P=[["let musicEl=null,sndOn=true;", "let musicEl=null,sndOn=true;\nlet MUSK=.55,musDk=0;\nfunction musVol(){try{if(musicEl)musicEl.volume=musDk?.06:MUSK;}catch(e){}}\nwindow.musDuck=function(on){musDk=on;musVol();};\nasync function musStart(){\n if(window.__musOn)return;window.__musOn=1;\n const a=new Audio();a.preload='auto';a.setAttribute('playsinline','');musicEl=a;musVol();\n let L=[];\n try{L=(await fbList('music')).filter(x=>x.hm&&+x.n>=1&&+x.n<=5).sort((p,q)=>+p.n-+q.n);}catch(e){}\n if(!L.length)return;\n const U={};let i=0,bad=0;\n const load=async n=>{if(!U[n]){const d=await medGet('music_m'+n);if(d)U[n]=d;}return U[n]||'';};\n const playN=async()=>{\n  const x=L[i%L.length];const d=await load(x.n);\n  if(!d){bad++;i++;if(bad<=L.length*2)setTimeout(playN,400);return;}\n  bad=0;a.src=d;\n  try{await a.play();}catch(e){document.addEventListener('pointerdown',()=>{a.play().catch(()=>{});},{once:true});}\n };\n a.onended=()=>{i++;playN();};\n document.addEventListener('visibilitychange',()=>{try{if(document.hidden)a.pause();else if(a.src)a.play().catch(()=>{});}catch(e){}});\n playN();\n}\n"], ["$('go').onclick=()=>{audioInit();", "$('go').onclick=()=>{audioInit();try{musStart();}catch(e){}"], ["window.auPlay&&window.auPlay();", "window.auPlay&&window.auPlay();window.musDuck&&window.musDuck(1);"], ["window.auStop&&window.auStop();", "window.auStop&&window.auStop();window.musDuck&&window.musDuck(0);"]];
+(async function(){
+ var m=document.getElementById('m');
+ try{
+  var r=await fetch('plumes-visite-v70.html');
+  if(!r.ok){m.textContent='La visite est introuvable ('+r.status+').';return}
+  var h=await r.text();
+  for(var i=0;i<P.length;i++){
+   if(h.split(P[i][0]).length<2){m.textContent='Mise à jour impossible (étape '+(i+1)+').';return}
+   h=h.split(P[i][0]).join(P[i][1]);
+  }
+  document.open();document.write(h);document.close();
+ }catch(e){m.textContent='Problème : '+(e&&e.message?e.message:e)}
+})();
+</script></body></html>
