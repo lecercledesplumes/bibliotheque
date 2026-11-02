@@ -144,6 +144,19 @@ img.prev{max-width:120px;max-height:170px;border-radius:8px;border:1px solid var
   <div id="ecMsg"></div>
  </div>
 
+
+ <div class="card">
+  <h2>7 · Vidéo des poissons (grand écran, 2e rideau)</h2>
+  <p class="mut" style="margin-top:0">La vidéo jouée sur le grand écran du fond quand le rideau se <b>rouvre</b>, à la place des poissons. Elle peut être <b>carrée (1:1)</b> ou <b>large (16:9)</b>. Si elle pèse plus de <b>3,9 Mo</b>, elle est <b>réduite automatiquement</b> (60 secondes maximum). Sans vidéo ajoutée, les <b>poissons</b> restent.</p>
+  <div id="aqStatus" class="mut">Vérification…</div>
+  <label>Fichier vidéo (mp4)</label>
+  <input type="file" id="aqFile" accept="video/mp4,video/*">
+  <video id="aqPrev" class="hide" controls playsinline style="width:100%;max-width:300px;border-radius:10px;margin-top:10px;background:#000"></video>
+  <div id="aqInfo" class="mut"></div>
+  <div class="row" style="margin-top:12px"><button id="aqSave" style="flex:1">Envoyer la vidéo</button><button id="aqDel" class="bad">Remettre les poissons</button></div>
+  <div id="aqMsg"></div>
+ </div>
+
  <p class="mut">Les changements apparaissent dans la visite dès que le visiteur la recharge. Pas besoin de toucher à GitHub.</p>
 </div>
 
@@ -198,7 +211,7 @@ auth.onAuthStateChanged(function(u){
   }
   show('vLogin',false);show('vMain',true);
   $('who').textContent=u.email;
-  buildTabs();buildVisSel();loadSeries(cur);musLoadAll();amInit();ecStatus();
+  buildTabs();buildVisSel();loadSeries(cur);musLoadAll();amInit();ecStatus();aqStatus();
 });
 
 /* ---------- séries ---------- */
@@ -561,6 +574,141 @@ $('ecDel').onclick=function(){
   for(var i=0;i<8;i++)b.delete(db.collection('media').doc('ecran_'+i));
   b.commit().then(function(){ecState=null;ecData=null;$('ecFile').value='';show('ecPrev',false);ecShow();say('ecMsg','Ta vidéo est retirée : la vidéo d’origine est de nouveau utilisée.','ok');})
    .catch(function(e){say('ecMsg',esc(errTxt(e)),'bad');});
+};
+/* ---------- vidéo des poissons (series/poissons + media/poissons_0..n) ---------- */
+var AQCH=880000,AQMAX=6,aqData=null,aqState=null;
+function aqShow(){
+  var s=aqState?'Ta vidéo est en ligne ('+(aqState.kb||'?')+' Ko, '+aqState.n+' morceau'+(aqState.n>1?'x':'')+').':'Aucune vidéo à toi : les poissons sont utilisés.';
+  if(aqData)s+=' Nouvelle vidéo prête à envoyer ('+kb(aqData.length*0.75)+' Ko).';
+  $('aqStatus').textContent=s;
+}
+function aqStatus(){
+  db.collection('series').doc('poissons').get().then(function(d){
+    var x=d.exists?d.data():null;aqState=(x&&x.n>=1)?x:null;aqShow();
+  }).catch(function(e){say('aqMsg',esc(errTxt(e)),'bad');});
+}
+
+/* ---------- réduction automatique d'une vidéo trop lourde ---------- */
+var AQRAW=AQCH*AQMAX*0.75,AQTARGET=3400000,aqBusy=false;
+function aqMime(){
+  if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return '';
+  var c=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  for(var i=0;i<c.length;i++){try{if(MediaRecorder.isTypeSupported(c[i]))return c[i];}catch(e){}}
+  return '';
+}
+function aqCompress(f,onProg){
+  return new Promise(function(res,rej){
+    var mime=aqMime();
+    var cv=document.createElement('video');
+    if(!mime||!cv.captureStream&&!HTMLCanvasElement.prototype.captureStream){rej(new Error('nosupport'));return;}
+    var url=URL.createObjectURL(f),done=false,rec=null,timer=null,actx=null;
+    cv.src=url;cv.playsInline=true;cv.setAttribute('playsinline','');cv.preload='auto';cv.muted=false;
+    cv.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none';
+    document.body.appendChild(cv);
+    function clean(){done=true;if(timer)clearInterval(timer);try{cv.pause();}catch(e){}try{URL.revokeObjectURL(url);}catch(e){}if(cv.parentNode)cv.parentNode.removeChild(cv);try{if(actx)actx.close();}catch(e){}}
+    function fail(m){if(done)return;clean();rej(new Error(m));}
+    cv.onerror=function(){fail('Cette vidéo n’est pas lisible par ce téléphone.');};
+    cv.onloadedmetadata=function(){
+      var vw=cv.videoWidth,vh=cv.videoHeight,dur=cv.duration;
+      if(!vw||!vh||!isFinite(dur)||dur<=0){fail('Cette vidéo n’est pas lisible par ce téléphone.');return;}
+      var T=Math.min(dur,60),W,H;
+      if(vw/vh>1.2){W=640;H=Math.round(640*vh/vw/2)*2;}else if(vh>vw*1.05){H=480;W=Math.round(480*vw/vh/2)*2;}else{W=480;H=480;}
+      var vbps=Math.floor(AQTARGET*8/T-56000);vbps=Math.max(120000,Math.min(2500000,vbps));
+      var cn=document.createElement('canvas');cn.width=W;cn.height=H;var cx=cn.getContext('2d');
+      var st=cn.captureStream(24);
+      try{
+        var AC=window.AudioContext||window.webkitAudioContext;
+        if(AC){actx=new AC();var src=actx.createMediaElementSource(cv),dst=actx.createMediaStreamDestination();src.connect(dst);dst.stream.getAudioTracks().forEach(function(t){st.addTrack(t);});if(actx.resume)actx.resume();}
+      }catch(e){}
+      try{rec=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:vbps,audioBitsPerSecond:48000});}
+      catch(e){try{rec=new MediaRecorder(st,{mimeType:mime});}catch(e2){fail('nosupport');return;}}
+      var ch=[];
+      rec.ondataavailable=function(e){if(e.data&&e.data.size)ch.push(e.data);};
+      rec.onstop=function(){
+        if(done)return;var cut=dur>60;var m=(rec.mimeType||mime).split(';')[0];
+        var blob=new Blob(ch,{type:m});clean();res({blob:blob,w:W,h:H,dur:Math.round(T),cut:cut,mime:m});
+      };
+      rec.start(500);
+      cv.currentTime=0;
+      var p=cv.play();if(p&&p.catch)p.catch(function(){fail('Le téléphone a refusé de lire la vidéo. Touche à nouveau le bouton.');});
+      timer=setInterval(function(){
+        if(done)return;
+        try{cx.drawImage(cv,0,0,W,H);}catch(e){}
+        if(onProg)onProg(Math.min(99,Math.round(cv.currentTime/T*100)));
+        if(cv.ended||cv.currentTime>=T-0.05){clearInterval(timer);timer=null;setTimeout(function(){if(rec&&rec.state!=='inactive')rec.stop();},300);}
+      },1000/24);
+    };
+  });
+}
+function aqReduce(f){
+  if(aqBusy)return;aqBusy=true;$('aqFile').disabled=true;$('aqSave').disabled=true;
+  say('aqMsg','Vidéo trop lourde : je la réduis toute seule. Ça dure à peu près la durée de la vidéo. <b>Reste sur cette page, écran allumé.</b> <span id="aqPct">0 %</span>','info');
+  aqCompress(f,function(p){var e=$('aqPct');if(e)e.textContent=p+' %';}).then(function(r){
+    if(r.blob.size>AQRAW){throw new Error('Après réduction, la vidéo pèse encore '+kb(r.blob.size)+' Ko. Choisis une vidéo plus courte (moins de 40 secondes).');}
+    return readDataURL(r.blob).then(function(d){
+      var b=d.split(',')[1]||'';
+      if(!b||b.length>AQCH*AQMAX)throw new Error('La vidéo réduite est encore trop lourde. Choisis une vidéo plus courte.');
+      aqData=b;aqShow();
+      var v=$('aqPrev');v.src=URL.createObjectURL(r.blob);show('aqPrev',true);
+      $('aqInfo').textContent=r.dur+' s · '+r.w+' × '+r.h+' · '+kb(r.blob.size)+' Ko';
+      var warn=r.mime.indexOf('mp4')<0?' Format WebM : si un visiteur sur iPhone ne voit pas la vidéo, refais-la dans CapCut en MP4.':'';
+      say('aqMsg','Vidéo réduite : '+kb(r.blob.size)+' Ko'+(r.cut?' (seules les 60 premières secondes sont gardées)':'')+'. Touche « Envoyer la vidéo ».'+warn,'ok');
+    });
+  }).catch(function(e){
+    $('aqFile').value='';aqData=null;aqShow();
+    if(e.message==='nosupport')say('aqMsg','Ce navigateur ne sait pas réduire la vidéo. Dans CapCut, exporte en 480 × 480 (carré), qualité moyenne, et raccourcis un peu.','bad');
+    else say('aqMsg',esc(e.message),'bad');
+  }).then(function(){aqBusy=false;$('aqFile').disabled=false;$('aqSave').disabled=false;});
+}
+$('aqFile').onchange=function(){
+  var f=this.files&&this.files[0];aqData=null;show('aqPrev',false);$('aqInfo').textContent='';say('aqMsg','');
+  if(!f){aqShow();return;}
+  if(f.size>AQRAW){aqReduce(f);return;}
+  readDataURL(f).then(function(d){
+    var b=d.split(',')[1]||'';
+    if(!b||b.length>AQCH*AQMAX){
+      $('aqFile').value='';
+      say('aqMsg','Cette vidéo est trop lourde ('+kb(f.size)+' Ko). Maximum : 3,9 Mo. Dans CapCut, exporte en 480 × 480 (carré), qualité moyenne, et raccourcis un peu si besoin.','bad');
+      aqShow();return;
+    }
+    aqData=b;aqShow();
+    var v=$('aqPrev');
+    v.onloadedmetadata=function(){
+      var w=v.videoWidth,h=v.videoHeight,dur=isFinite(v.duration)?Math.round(v.duration):0;
+      var inf=(dur?dur+' s · ':'')+(w?w+' × '+h:'');
+      if(w&&h&&h>w+2)say('aqMsg','Attention : cette vidéo est en hauteur ('+w+' × '+h+'). Elle sera petite sur le grand écran. Exporte-la en 1:1 ou en 16:9.','info');
+      $('aqInfo').textContent=inf;
+    };
+    v.src=URL.createObjectURL(f);show('aqPrev',true);
+  }).catch(function(e){say('aqMsg',esc(e.message),'bad');});
+};
+$('aqSave').onclick=function(){
+  if(!aqData){say('aqMsg','Choisis d’abord une vidéo.','bad');return;}
+  var b=aqData,n=Math.ceil(b.length/AQCH),oldN=(aqState&&aqState.n)||0,k=kb(b.length*0.75);
+  var ref=db.collection('series').doc('poissons');
+  $('aqSave').disabled=true;$('aqDel').disabled=true;say('aqMsg','Envoi en cours…','info');
+  var p=ref.set({n:0,updated:Date.now()});
+  for(var i=0;i<n;i++){(function(i){p=p.then(function(){
+    say('aqMsg','Envoi '+(i+1)+' / '+n+'… ne ferme pas la page.','info');
+    return db.collection('media').doc('poissons_'+i).set({d:b.slice(i*AQCH,(i+1)*AQCH)});
+  });})(i);}
+  p=p.then(function(){return ref.set({n:n,mime:'video/mp4',kb:k,updated:Date.now()});});
+  p=p.then(function(){
+    if(oldN>n){var b2=db.batch();for(var i=n;i<oldN;i++)b2.delete(db.collection('media').doc('poissons_'+i));return b2.commit();}
+  });
+  p.then(function(){
+    aqState={n:n,kb:k};aqData=null;$('aqFile').value='';show('aqPrev',false);$('aqInfo').textContent='';aqShow();
+    say('aqMsg','Vidéo enregistrée. Elle remplacera les poissons au 2e rideau, dès le prochain chargement de la visite.','ok');
+  }).catch(function(e){say('aqMsg',esc(errTxt(e)),'bad');aqStatus();})
+   .then(function(){$('aqSave').disabled=false;$('aqDel').disabled=false;});
+};
+$('aqDel').onclick=function(){
+  if(!this.dataset.sure){var t=this;t.dataset.sure='1';t.textContent='Touche encore pour confirmer';setTimeout(function(){delete t.dataset.sure;t.textContent='Remettre les poissons';},4000);return;}
+  delete this.dataset.sure;this.textContent='Remettre les poissons';
+  var b=db.batch();b.delete(db.collection('series').doc('poissons'));
+  for(var i=0;i<8;i++)b.delete(db.collection('media').doc('poissons_'+i));
+  b.commit().then(function(){aqState=null;aqData=null;$('aqFile').value='';show('aqPrev',false);aqShow();say('aqMsg','Ta vidéo est retirée : les poissons sont de nouveau utilisés.','ok');})
+   .catch(function(e){say('aqMsg',esc(errTxt(e)),'bad');});
 };
 })();
 </script>
