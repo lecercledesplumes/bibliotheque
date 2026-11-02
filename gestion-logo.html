@@ -132,6 +132,18 @@ img.prev{max-width:120px;max-height:170px;border-radius:8px;border:1px solid var
   <div id="amMsg"></div>
  </div>
 
+ <div class="card">
+  <h2>6 · Vidéo du grand écran</h2>
+  <p class="mut" style="margin-top:0">La vidéo de présentation des auteurs, jouée sur le grand écran du fond. Elle doit être <b>carrée (format 1:1)</b>, en MP4, de <b>3,9 Mo maximum</b> (environ 40 secondes en 480 × 480). Sans vidéo ajoutée, la vidéo d’origine est gardée.</p>
+  <div id="ecStatus" class="mut">Vérification…</div>
+  <label>Fichier vidéo (mp4)</label>
+  <input type="file" id="ecFile" accept="video/mp4,video/*">
+  <video id="ecPrev" class="hide" controls playsinline style="width:100%;max-width:300px;border-radius:10px;margin-top:10px;background:#000"></video>
+  <div id="ecInfo" class="mut"></div>
+  <div class="row" style="margin-top:12px"><button id="ecSave" style="flex:1">Envoyer la vidéo</button><button id="ecDel" class="bad">Remettre l’origine</button></div>
+  <div id="ecMsg"></div>
+ </div>
+
  <p class="mut">Les changements apparaissent dans la visite dès que le visiteur la recharge. Pas besoin de toucher à GitHub.</p>
 </div>
 
@@ -186,7 +198,7 @@ auth.onAuthStateChanged(function(u){
   }
   show('vLogin',false);show('vMain',true);
   $('who').textContent=u.email;
-  buildTabs();buildVisSel();loadSeries(cur);musLoadAll();amInit();
+  buildTabs();buildVisSel();loadSeries(cur);musLoadAll();amInit();ecStatus();
 });
 
 /* ---------- séries ---------- */
@@ -413,6 +425,68 @@ $('amSave').onclick=function(){
   db.collection('series').doc('salle').set({lum:AM.lum,r:AM.r,g:AM.g,b:AM.b,dimv:AM.dimv,updated:Date.now()},{merge:true}).then(function(){
     say('amMsg','Ambiance enregistrée. Elle apparaît dans la visite au prochain chargement.','ok');
   }).catch(function(e){say('amMsg',esc(errTxt(e)),'bad');}).then(function(){$('amSave').disabled=false;});
+};
+
+/* ---------- vidéo du grand écran (series/ecran + media/ecran_0..n) ---------- */
+var ECCH=880000,ECMAX=6,ecData=null,ecState=null;
+function ecShow(){
+  var s=ecState?'Ta vidéo est en ligne ('+(ecState.kb||'?')+' Ko, '+ecState.n+' morceau'+(ecState.n>1?'x':'')+').':'Aucune vidéo à toi : la vidéo d’origine est utilisée.';
+  if(ecData)s+=' Nouvelle vidéo prête à envoyer ('+kb(ecData.length*0.75)+' Ko).';
+  $('ecStatus').textContent=s;
+}
+function ecStatus(){
+  db.collection('series').doc('ecran').get().then(function(d){
+    var x=d.exists?d.data():null;ecState=(x&&x.n>=1)?x:null;ecShow();
+  }).catch(function(e){say('ecMsg',esc(errTxt(e)),'bad');});
+}
+$('ecFile').onchange=function(){
+  var f=this.files&&this.files[0];ecData=null;show('ecPrev',false);$('ecInfo').textContent='';say('ecMsg','');
+  if(!f){ecShow();return;}
+  readDataURL(f).then(function(d){
+    var b=d.split(',')[1]||'';
+    if(!b||b.length>ECCH*ECMAX){
+      $('ecFile').value='';
+      say('ecMsg','Cette vidéo est trop lourde ('+kb(f.size)+' Ko). Maximum : 3,9 Mo. Dans CapCut, exporte en 480 × 480 (carré), qualité moyenne, et raccourcis un peu si besoin.','bad');
+      ecShow();return;
+    }
+    ecData=b;ecShow();
+    var v=$('ecPrev');
+    v.onloadedmetadata=function(){
+      var w=v.videoWidth,h=v.videoHeight,dur=isFinite(v.duration)?Math.round(v.duration):0;
+      var inf=(dur?dur+' s · ':'')+(w?w+' × '+h:'');
+      if(w&&h&&Math.abs(w-h)>2)say('ecMsg','Attention : cette vidéo n’est pas carrée ('+w+' × '+h+'). Elle sera déformée sur le grand écran. Exporte-la en format 1:1.','info');
+      $('ecInfo').textContent=inf;
+    };
+    v.src=URL.createObjectURL(f);show('ecPrev',true);
+  }).catch(function(e){say('ecMsg',esc(e.message),'bad');});
+};
+$('ecSave').onclick=function(){
+  if(!ecData){say('ecMsg','Choisis d’abord une vidéo.','bad');return;}
+  var b=ecData,n=Math.ceil(b.length/ECCH),oldN=(ecState&&ecState.n)||0,k=kb(b.length*0.75);
+  var ref=db.collection('series').doc('ecran');
+  $('ecSave').disabled=true;$('ecDel').disabled=true;say('ecMsg','Envoi en cours…','info');
+  var p=ref.set({n:0,updated:Date.now()});
+  for(var i=0;i<n;i++){(function(i){p=p.then(function(){
+    say('ecMsg','Envoi '+(i+1)+' / '+n+'… ne ferme pas la page.','info');
+    return db.collection('media').doc('ecran_'+i).set({d:b.slice(i*ECCH,(i+1)*ECCH)});
+  });})(i);}
+  p=p.then(function(){return ref.set({n:n,mime:'video/mp4',kb:k,updated:Date.now()});});
+  p=p.then(function(){
+    if(oldN>n){var b2=db.batch();for(var i=n;i<oldN;i++)b2.delete(db.collection('media').doc('ecran_'+i));return b2.commit();}
+  });
+  p.then(function(){
+    ecState={n:n,kb:k};ecData=null;$('ecFile').value='';show('ecPrev',false);$('ecInfo').textContent='';ecShow();
+    say('ecMsg','Vidéo enregistrée. Elle passera sur le grand écran dès le prochain chargement de la visite.','ok');
+  }).catch(function(e){say('ecMsg',esc(errTxt(e)),'bad');ecStatus();})
+   .then(function(){$('ecSave').disabled=false;$('ecDel').disabled=false;});
+};
+$('ecDel').onclick=function(){
+  if(!this.dataset.sure){var t=this;t.dataset.sure='1';t.textContent='Touche encore pour confirmer';setTimeout(function(){delete t.dataset.sure;t.textContent='Remettre l’origine';},4000);return;}
+  delete this.dataset.sure;this.textContent='Remettre l’origine';
+  var b=db.batch();b.delete(db.collection('series').doc('ecran'));
+  for(var i=0;i<8;i++)b.delete(db.collection('media').doc('ecran_'+i));
+  b.commit().then(function(){ecState=null;ecData=null;$('ecFile').value='';show('ecPrev',false);ecShow();say('ecMsg','Ta vidéo est retirée : la vidéo d’origine est de nouveau utilisée.','ok');})
+   .catch(function(e){say('ecMsg',esc(errTxt(e)),'bad');});
 };
 })();
 </script>
