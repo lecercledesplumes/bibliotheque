@@ -134,7 +134,7 @@ img.prev{max-width:120px;max-height:170px;border-radius:8px;border:1px solid var
 
  <div class="card">
   <h2>6 · Vidéo du grand écran</h2>
-  <p class="mut" style="margin-top:0">La vidéo de présentation des auteurs, jouée sur le grand écran du fond. Elle doit être <b>carrée (format 1:1)</b>, en MP4, de <b>3,9 Mo maximum</b> (environ 40 secondes en 480 × 480). Sans vidéo ajoutée, la vidéo d’origine est gardée.</p>
+  <p class="mut" style="margin-top:0">La vidéo de présentation des auteurs, jouée sur le grand écran du fond. Elle peut être <b>carrée (1:1)</b> ou <b>large (16:9)</b>, en MP4, de <b>3,9 Mo maximum</b> (environ 40 secondes en 480 × 480, un peu plus en 16:9). Sans vidéo ajoutée, la vidéo d’origine est gardée.</p>
   <div id="ecStatus" class="mut">Vérification…</div>
   <label>Fichier vidéo (mp4)</label>
   <input type="file" id="ecFile" accept="video/mp4,video/*">
@@ -454,7 +454,7 @@ $('ecFile').onchange=function(){
     v.onloadedmetadata=function(){
       var w=v.videoWidth,h=v.videoHeight,dur=isFinite(v.duration)?Math.round(v.duration):0;
       var inf=(dur?dur+' s · ':'')+(w?w+' × '+h:'');
-      if(w&&h&&Math.abs(w-h)>2)say('ecMsg','Attention : cette vidéo n’est pas carrée ('+w+' × '+h+'). Elle sera déformée sur le grand écran. Exporte-la en format 1:1.','info');
+      if(w&&h&&h>w+2)say('ecMsg','Attention : cette vidéo est en hauteur ('+w+' × '+h+'). Elle sera petite sur le grand écran. Exporte-la en 1:1 ou en 16:9.','info');
       $('ecInfo').textContent=inf;
     };
     v.src=URL.createObjectURL(f);show('ecPrev',true);
