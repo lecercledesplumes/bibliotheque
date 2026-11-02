@@ -134,7 +134,7 @@ img.prev{max-width:120px;max-height:170px;border-radius:8px;border:1px solid var
 
  <div class="card">
   <h2>6 · Vidéo du grand écran</h2>
-  <p class="mut" style="margin-top:0">La vidéo de présentation des auteurs, jouée sur le grand écran du fond. Elle peut être <b>carrée (1:1)</b> ou <b>large (16:9)</b>, en MP4, de <b>3,9 Mo maximum</b> (environ 40 secondes en 480 × 480, un peu plus en 16:9). Sans vidéo ajoutée, la vidéo d’origine est gardée.</p>
+  <p class="mut" style="margin-top:0">La vidéo de présentation des auteurs, jouée sur le grand écran du fond. Elle peut être <b>carrée (1:1)</b> ou <b>large (16:9)</b>. Si elle pèse plus de <b>3,9 Mo</b>, elle est <b>réduite automatiquement</b> (60 secondes maximum, ça prend à peu près la durée de la vidéo). Sans vidéo ajoutée, la vidéo d’origine est gardée.</p>
   <div id="ecStatus" class="mut">Vérification…</div>
   <label>Fichier vidéo (mp4)</label>
   <input type="file" id="ecFile" accept="video/mp4,video/*">
@@ -439,9 +439,83 @@ function ecStatus(){
     var x=d.exists?d.data():null;ecState=(x&&x.n>=1)?x:null;ecShow();
   }).catch(function(e){say('ecMsg',esc(errTxt(e)),'bad');});
 }
+
+/* ---------- réduction automatique d'une vidéo trop lourde ---------- */
+var ECRAW=ECCH*ECMAX*0.75,ECTARGET=3400000,ecBusy=false;
+function ecMime(){
+  if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return '';
+  var c=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  for(var i=0;i<c.length;i++){try{if(MediaRecorder.isTypeSupported(c[i]))return c[i];}catch(e){}}
+  return '';
+}
+function ecCompress(f,onProg){
+  return new Promise(function(res,rej){
+    var mime=ecMime();
+    var cv=document.createElement('video');
+    if(!mime||!cv.captureStream&&!HTMLCanvasElement.prototype.captureStream){rej(new Error('nosupport'));return;}
+    var url=URL.createObjectURL(f),done=false,rec=null,timer=null,actx=null;
+    cv.src=url;cv.playsInline=true;cv.setAttribute('playsinline','');cv.preload='auto';cv.muted=false;
+    cv.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none';
+    document.body.appendChild(cv);
+    function clean(){done=true;if(timer)clearInterval(timer);try{cv.pause();}catch(e){}try{URL.revokeObjectURL(url);}catch(e){}if(cv.parentNode)cv.parentNode.removeChild(cv);try{if(actx)actx.close();}catch(e){}}
+    function fail(m){if(done)return;clean();rej(new Error(m));}
+    cv.onerror=function(){fail('Cette vidéo n’est pas lisible par ce téléphone.');};
+    cv.onloadedmetadata=function(){
+      var vw=cv.videoWidth,vh=cv.videoHeight,dur=cv.duration;
+      if(!vw||!vh||!isFinite(dur)||dur<=0){fail('Cette vidéo n’est pas lisible par ce téléphone.');return;}
+      var T=Math.min(dur,60),W,H;
+      if(vw/vh>1.2){W=640;H=Math.round(640*vh/vw/2)*2;}else if(vh>vw*1.05){H=480;W=Math.round(480*vw/vh/2)*2;}else{W=480;H=480;}
+      var vbps=Math.floor(ECTARGET*8/T-56000);vbps=Math.max(120000,Math.min(2500000,vbps));
+      var cn=document.createElement('canvas');cn.width=W;cn.height=H;var cx=cn.getContext('2d');
+      var st=cn.captureStream(24);
+      try{
+        var AC=window.AudioContext||window.webkitAudioContext;
+        if(AC){actx=new AC();var src=actx.createMediaElementSource(cv),dst=actx.createMediaStreamDestination();src.connect(dst);dst.stream.getAudioTracks().forEach(function(t){st.addTrack(t);});if(actx.resume)actx.resume();}
+      }catch(e){}
+      try{rec=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:vbps,audioBitsPerSecond:48000});}
+      catch(e){try{rec=new MediaRecorder(st,{mimeType:mime});}catch(e2){fail('nosupport');return;}}
+      var ch=[];
+      rec.ondataavailable=function(e){if(e.data&&e.data.size)ch.push(e.data);};
+      rec.onstop=function(){
+        if(done)return;var cut=dur>60;var m=(rec.mimeType||mime).split(';')[0];
+        var blob=new Blob(ch,{type:m});clean();res({blob:blob,w:W,h:H,dur:Math.round(T),cut:cut,mime:m});
+      };
+      rec.start(500);
+      cv.currentTime=0;
+      var p=cv.play();if(p&&p.catch)p.catch(function(){fail('Le téléphone a refusé de lire la vidéo. Touche à nouveau le bouton.');});
+      timer=setInterval(function(){
+        if(done)return;
+        try{cx.drawImage(cv,0,0,W,H);}catch(e){}
+        if(onProg)onProg(Math.min(99,Math.round(cv.currentTime/T*100)));
+        if(cv.ended||cv.currentTime>=T-0.05){clearInterval(timer);timer=null;setTimeout(function(){if(rec&&rec.state!=='inactive')rec.stop();},300);}
+      },1000/24);
+    };
+  });
+}
+function ecReduce(f){
+  if(ecBusy)return;ecBusy=true;$('ecFile').disabled=true;$('ecSave').disabled=true;
+  say('ecMsg','Vidéo trop lourde : je la réduis toute seule. Ça dure à peu près la durée de la vidéo. <b>Reste sur cette page, écran allumé.</b> <span id="ecPct">0 %</span>','info');
+  ecCompress(f,function(p){var e=$('ecPct');if(e)e.textContent=p+' %';}).then(function(r){
+    if(r.blob.size>ECRAW){throw new Error('Après réduction, la vidéo pèse encore '+kb(r.blob.size)+' Ko. Choisis une vidéo plus courte (moins de 40 secondes).');}
+    return readDataURL(r.blob).then(function(d){
+      var b=d.split(',')[1]||'';
+      if(!b||b.length>ECCH*ECMAX)throw new Error('La vidéo réduite est encore trop lourde. Choisis une vidéo plus courte.');
+      ecData=b;ecShow();
+      var v=$('ecPrev');v.src=URL.createObjectURL(r.blob);show('ecPrev',true);
+      $('ecInfo').textContent=r.dur+' s · '+r.w+' × '+r.h+' · '+kb(r.blob.size)+' Ko';
+      var warn=r.mime.indexOf('mp4')<0?' Format WebM : si un visiteur sur iPhone ne voit pas la vidéo, refais-la dans CapCut en MP4.':'';
+      say('ecMsg','Vidéo réduite : '+kb(r.blob.size)+' Ko'+(r.cut?' (seules les 60 premières secondes sont gardées)':'')+'. Touche « Envoyer la vidéo ».'+warn,'ok');
+    });
+  }).catch(function(e){
+    $('ecFile').value='';ecData=null;ecShow();
+    if(e.message==='nosupport')say('ecMsg','Ce navigateur ne sait pas réduire la vidéo. Dans CapCut, exporte en 480 × 480 (carré), qualité moyenne, et raccourcis un peu.','bad');
+    else say('ecMsg',esc(e.message),'bad');
+  }).then(function(){ecBusy=false;$('ecFile').disabled=false;$('ecSave').disabled=false;});
+}
 $('ecFile').onchange=function(){
   var f=this.files&&this.files[0];ecData=null;show('ecPrev',false);$('ecInfo').textContent='';say('ecMsg','');
   if(!f){ecShow();return;}
+  if(f.size>ECRAW){ecReduce(f);return;}
   readDataURL(f).then(function(d){
     var b=d.split(',')[1]||'';
     if(!b||b.length>ECCH*ECMAX){
